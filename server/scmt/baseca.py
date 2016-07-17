@@ -5,6 +5,7 @@ import textwrap
 import datetime
 import time
 import loggable
+import shutil
 import re
 try:
     from urllib.request import urlopen # Python 3
@@ -16,6 +17,10 @@ class BaseCA(loggable.Loggable):
     def __init__(self, options):
         if 'dir' in options:
             self._dir = options['dir']
+        if 'certificate_expiration' in options:
+            self._certificate_expiration = int(options['certificate_expiration'])
+        else:
+            self._certificate_expiration = 86400 * 14
 
         if 'request_cleanup' in options:
             self._request_cleanup = int(options['request_cleanup'])
@@ -29,9 +34,11 @@ class BaseCA(loggable.Loggable):
                 os.makedirs(self._dir + '/' + hostname)
 
             self.log("Generating new key in %s" % path)
-            gencmd = ['openssl', 'genrsa', '-out', path, str(bits)]
-            cmd = subprocess.Popen(gencmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            generate_cmd = ['openssl', 'genrsa', '-out', path, str(bits)]
+            cmd = subprocess.Popen(generate_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             res = cmd.wait()
+            if res != 0:
+                raise RuntimeError("Failed to generate host key, host: %s" % hostname)
         else:
             self.log("Private key %s already exists, using it" % path)
 
@@ -46,6 +53,9 @@ class BaseCA(loggable.Loggable):
         crt_path = self._dir + '/' + hostname + '/cert.pem'
         if ip:
             self.register_request(hostname, ip)
+
+        if not os.path.exists(crt_path):
+            return None
 
         with open(crt_path, 'r') as crt:
             return crt.read()
@@ -71,6 +81,12 @@ class BaseCA(loggable.Loggable):
         return len(os.listdir(requests_dir)) > 0
 
     def cleanup_requests(self, hostname):
+        """
+        Cleanup host requests history, removes expired requests logs
+
+        :param hostname:
+        :return:
+        """
         requests_dir = self._dir + '/' + hostname + '/requests'
         if not os.path.exists(requests_dir):
             return True
@@ -87,6 +103,9 @@ class BaseCA(loggable.Loggable):
                 self.log("No requests for %s from IP %s for %d days" % (hostname, ip, (time.time() - timestamp) / 86400))
 
     def get_full_chain(self, hostname):
+        """
+        Get all certificates in chain
+        """
         chain_path = self._dir + '/' + hostname + '/fullchain.pem'
         if not os.path.exists(chain_path):
             self.log("Loading certificate chain for %s" % hostname)
@@ -120,6 +139,12 @@ class BaseCA(loggable.Loggable):
         return """-----BEGIN CERTIFICATE-----\n%s\n-----END CERTIFICATE-----\n""" % encoded
 
     def get_cert_info(self, crt):
+        """
+        Read info from PEM encoded certificate
+
+        :param crt:
+        :return:
+        """
         run = ["openssl", "x509", "-text", "-noout"]
         cmd = subprocess.Popen(run, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
         cmd.stdin.write(crt)
@@ -148,15 +173,54 @@ class BaseCA(loggable.Loggable):
 
         return info
 
+    def get_csr(self, hostname):
+        """
+        Get CSR path of certificate, if it's not available then generate it
+
+        :param hostname:
+        :return:
+        """
+        csr_path = self._dir + '/' + hostname + '/request.csr'
+        key_path = self._dir + '/' + hostname + '/key.pem'
+
+        if not os.path.exists(csr_path):
+            self.log("Generating new CSR request for %s, output %s" % (hostname, csr_path))
+
+            gencmd = ["openssl", "req", "-key", key_path, "-new", "-out", csr_path, "-subj", "/CN=" + hostname]
+            cmd = subprocess.Popen(gencmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            res = cmd.wait()
+
+        return csr_path
+
     def cleanup_certificates(self):
+        """
+        Remove old and unused certificates, update expired certificates
+
+        :return:
+        """
         for hostname in os.listdir(self._dir):
             if not os.path.isdir(self._dir + '/' + hostname):
                 continue
 
             self.cleanup_requests(hostname)
             if not self.have_requests(hostname):
-                self.log("Certificates for %s is not needed anymore, might be deleted" % hostname)
+                self.log("Certificates for %s is not needed anymore, deleting it" % hostname)
+                shutil.rmtree(self._dir + '/' + hostname)
 
+            cert = self.get_cert(hostname)
+            if not cert:
+                continue
+
+            info = self.get_cert_info(cert)
+            if int(info['NotAfter'].strftime('%s')) - time.time() < self._certificate_expiration:
+                self.log("Certificate for %s need to be renewed" % hostname)
+                try:
+                    self.issue_certificate(hostname)
+                except RuntimeError:
+                    self.log("Failed to issue new certificate for %s" % hostname)
+
+    def issue_certificate(self, hostname):
+        pass
 
     def set_hook(self, hook):
         self._hook = hook

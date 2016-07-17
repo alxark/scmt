@@ -7,7 +7,6 @@ import time
 import hashlib
 import re
 import copy
-import textwrap
 from baseca import BaseCA
 try:
     from urllib.request import urlopen # Python 3
@@ -52,14 +51,8 @@ class LetsEncrypt(BaseCA):
         self.log("Initialize LetsEncrypt CA. URL: %s" % self.ca)
 
     def issue_certificate(self, hostname):
-        csr_path = self._dir + '/' + hostname + '/request.csr'
-        key_path = self._dir + '/' + hostname + '/key.pem'
+        csr_path = self.get_csr(hostname)
         crt_path = self._dir + '/' + hostname + '/cert.pem'
-
-        if not os.path.exists(csr_path):
-            gencmd = ["openssl", "req", "-key", key_path, "-new", "-out", csr_path, "-subj", "/CN=" + hostname]
-            cmd = subprocess.Popen(gencmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            res = cmd.wait()
 
         cert = self.sign(hostname, csr_path)
         with open(crt_path, 'w') as out:
@@ -76,8 +69,8 @@ class LetsEncrypt(BaseCA):
         if os.path.exists(self.account_key):
             return self.account_key
 
-        gencmd = ['openssl', 'genrsa', '-out', self.account_key, str(self.account_key_size)]
-        cmd = subprocess.Popen(gencmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        generate_cmd = ['openssl', 'genrsa', '-out', self.account_key, str(self.account_key_size)]
+        cmd = subprocess.Popen(generate_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         res = cmd.wait()
         self.log("Generating key size %d, path: %s" % (self.account_key_size, self.account_key))
         if res != 0:
@@ -142,7 +135,6 @@ class LetsEncrypt(BaseCA):
             "resource": "new-reg",
             "agreement": "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf"
         })
-
         return code, result
 
     def challenge(self, uri, key_authorization):
@@ -218,5 +210,4 @@ class LetsEncrypt(BaseCA):
         if code != 201:
             raise ValueError("Error signing certificate: {0} {1}".format(code, result))
 
-        encoded_cert = "\n".join(textwrap.wrap(base64.b64encode(result).decode('utf8'), 64))
-        return """-----BEGIN CERTIFICATE-----\n{0}\n-----END CERTIFICATE-----\n""".format(encoded_cert)
+        return self.convert2pem(result)
