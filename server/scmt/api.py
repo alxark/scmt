@@ -7,6 +7,8 @@ import SimpleHTTPServer
 import os
 import threading
 import json
+import time
+import ssl
 
 
 class _ScmtHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, loggable.Loggable):
@@ -98,10 +100,11 @@ class _ScmtApi(BaseHTTPServer.HTTPServer, loggable.Loggable):
 
 
 class Api(loggable.Loggable, threading.Thread):
-    def __init__(self, manager, port):
+    def __init__(self, manager, port, ssl=None):
         self.manager = manager
         self.port = port
-        self.host = '127.0.0.1'
+        self.host = '0.0.0.0'
+        self.ssl = ssl
 
         threading.Thread.__init__(self)
 
@@ -112,11 +115,30 @@ class Api(loggable.Loggable, threading.Thread):
         """
         Start HTTP daemon
         """
+
+
         self.log("Starting new API instance on %d" % self.port)
         http_handler = _ScmtHandler
         SocketServer.TCPServer.allow_reuse_address = True
 
         http_service = _ScmtApi((self.host, self.port), http_handler, manager=self.manager)
+
+        if self.ssl:
+            self.manager.get_key({'hostname': self.ssl, 'algo': 'RSA', 'bits': 2048})
+            key_path = self.manager.get_key_path(self.ssl)
+
+            while True:
+                res = self.manager.cert({'hostname': self.ssl, 'ip': '127.0.0.1'})
+                if res['status'] != 'available':
+                    time.sleep(10)
+                    continue
+
+                self.log("Certificate successfully received for %s" % self.ssl)
+                break
+
+            cert_path = self.manager.get_fullchain_path(self.ssl)
+            self.log("Key: %s, Cert: %s" % (key_path, cert_path))
+            http_service.socket = ssl.wrap_socket(http_service.socket, keyfile=key_path, certfile=cert_path, server_side=True)
 
         self.log("HTTP API server started")
         while self.is_running():

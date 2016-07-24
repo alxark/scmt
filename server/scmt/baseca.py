@@ -45,6 +45,12 @@ class BaseCA(loggable.Loggable):
         with open(path, 'r') as old_key:
             return old_key.read()
 
+    def get_key_path(self, hostname):
+        return self._dir + '/' + hostname + '/key.pem'
+
+    def get_fullchain_path(self, hostname):
+        return self._dir + '/' + hostname + '/fullchain.pem'
+
     def certificate_exists(self, hostname):
         path = self._dir + '/' + hostname + '/cert.pem'
         return os.path.exists(path)
@@ -205,7 +211,7 @@ class BaseCA(loggable.Loggable):
             self.cleanup_requests(hostname)
             if not self.have_requests(hostname):
                 self.log("Certificates for %s is not needed anymore, deleting it" % hostname)
-                shutil.rmtree(self._dir + '/' + hostname)
+              #  shutil.rmtree(self._dir + '/' + hostname)
 
             cert = self.get_cert(hostname)
             if not cert:

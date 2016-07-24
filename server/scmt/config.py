@@ -20,6 +20,9 @@ class ConfigReader(loggable.Loggable):
         self.port = parser.getint('general', 'port')
         self.log("Listen port %d" % self.port)
 
+        self.ssl = parser.get('general', 'ssl')
+        self.log("Using SSL certificate for local connections, hostname: %s" % self.ssl)
+
         sections = parser.sections()
         sections.remove('general')
 

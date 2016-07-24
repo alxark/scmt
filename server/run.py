@@ -1,4 +1,9 @@
-import scmt
+import sys
 from scmt.app import App
-App.i().set_config('/var/www/scmt/examples/config.ini')
+
+if len(sys.argv) != 2:
+    print("Running scmt.py <CONFIG>")
+    sys.exit(1)
+
+App.i().set_config(sys.argv[1])
 App.i().start()

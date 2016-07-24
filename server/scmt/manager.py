@@ -64,8 +64,10 @@ class Manager(loggable.Loggable, threading.Thread):
                 continue
 
             ca = self.get_ca(hostname)
-            ca.issue_certificate(hostname)
-
+            try:
+                ca.issue_certificate(hostname)
+            except RuntimeError as e:
+                self.log("Failed to issue certificate for %s, got error: %s" % (hostname, e.message))
 
     def add_to_queue(self, hostname):
         with self._queueLock:
@@ -102,6 +104,12 @@ class Manager(loggable.Loggable, threading.Thread):
         """
         key = self.get_ca(req['hostname']).generate_key(req['hostname'], req['algo'], int(req['bits']))
         return {'key': key}
+
+    def get_key_path(self, hostname):
+        return self.get_ca(hostname).get_key_path(hostname)
+
+    def get_fullchain_path(self, hostname):
+        return self.get_ca(hostname).get_fullchain_path(hostname)
 
     def cert(self, req):
         """

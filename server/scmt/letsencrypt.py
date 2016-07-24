@@ -208,6 +208,6 @@ class LetsEncrypt(BaseCA):
         self._hook.clean_challenge(hostname, challenge_token)
 
         if code != 201:
-            raise ValueError("Error signing certificate: {0} {1}".format(code, result))
+            raise RuntimeError("Error signing certificate: {0} {1}".format(code, result))
 
         return self.convert2pem(result)

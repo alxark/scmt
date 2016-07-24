@@ -17,7 +17,7 @@ class App(loggable.Loggable):
     def start(self):
         self.log("Starting app")
         manager = Manager(self.config.dir, self.config.get_domains())
-        api = Api(manager, self.config.port)
+        api = Api(manager, self.config.port, self.config.ssl)
         api.start()
         manager.start()
 
