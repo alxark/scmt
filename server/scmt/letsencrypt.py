@@ -24,6 +24,8 @@ class LetsEncrypt(BaseCA):
 
     def __init__(self, options):
         BaseCA.__init__(self, options)
+        # when we was last time limited
+        self._rate_limit_last = 0
 
         self._hook = False
 
@@ -122,7 +124,7 @@ class LetsEncrypt(BaseCA):
         try:
             resp = urlopen(url, data.encode('utf8'))
             return resp.getcode(), resp.read()
-        except IOError as e:
+        except (IOError, OSError) as e:
             return getattr(e, "code", None), getattr(e, "read", e.__str__)()
 
     def register(self):
@@ -152,11 +154,15 @@ class LetsEncrypt(BaseCA):
         return code, result
 
     def sign(self, hostname, csr):
+        if self._rate_limit_last > time.time() - 43200:
+            mins_ago = int((time.time() - self._rate_limit_last)/60)
+            raise RuntimeError("Denied sign because we have reached cert limit. Last error was %d mins ago" % mins_ago)
+
         self.log("Signing new CSR, hostname %s" % hostname)
         code, result = self._request(self.ca + "/acme/new-authz", {
             "resource": "new-authz",
             "identifier": {"type": "dns", "value": hostname},
-        })
+            })
 
         if code != 201:
             self.log("Failed to start new issue. Got reply code: %d, answer: %s" % (code, result))
@@ -206,6 +212,13 @@ class LetsEncrypt(BaseCA):
         code, result = self.new_cert(self._b64(csr_der))
 
         self._hook.clean_challenge(hostname, challenge_token)
+
+        if code == 429:
+            info = json.loads(result)
+            if 'type' in info:
+                if info['type'] == 'urn:acme:error:rateLimited':
+                    self._rate_limit_last = time.time()
+                    raise RuntimeError("Rate limit reached")
 
         if code != 201:
             raise RuntimeError("Error signing certificate: {0} {1}".format(code, result))

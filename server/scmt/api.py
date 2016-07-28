@@ -22,30 +22,31 @@ class _ScmtHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, loggable.Loggable)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
 
-        #print(json.dumps(data))
-
         self.wfile.write(json.dumps(data))
+
+    def error(self, code, error):
+        self.log("[%s] Error: %s (%s)" % (self.client_address[0], str(code), error))
+        return self.json({'code': code, 'error': error}, code)
 
     def do_GET(self):
         return self.json({'ok': 1})
 
     def do_POST(self):
-        self.log("POST request found")
         if 'Content-Length' not in self.headers or int(self.headers['Content-Length']) == 0:
-            return self.json({'code': 500, 'error': 'bad_content_length'}, 500)
+            return self.error(500, 'bad_content_length')
 
         try:
             req = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         except IOError:
-            return self.json({'code': 500, 'error': 'failed_to_parse_request_body'}, 500)
+            return self.error(500, 'failed_to_parse_request_body')
 
         if 'type' not in req:
-            return self.json({'code': 500, 'error': 'unknown_request_type'})
+            return self.error(500, 'unknown_request_type')
 
         if req['type'] not in self.methods:
-            return self.json({'code': 500, 'error': 'unaceptable_request_method'}, 500)
+            return self.error(500, 'unacceptable_request_method')
 
-        req['ip'] = self.client_ip
+        req['ip'] = self.client_address[0]
 
         return getattr(self, req['type'] + '_call')(req)
 
@@ -58,11 +59,11 @@ class _ScmtHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, loggable.Loggable)
         :return:
         """
         if 'bits' not in req:
-            return self.json({'code': 500, 'error': 'key_bits_should_be_specified'}, 500)
+            return self.error(500, 'key_bits_should_be_specified')
         if 'hostname' not in req:
-            return self.json({'code': 500, 'error': 'key_hostname_should_be_specified'}, 500)
-        if 'algo' not in req or req['algo'] not in ['RSA', 'ECDSA']:
-            return self.json({'code': 500, 'error': 'empty_or_incorrect_algo'}, 500)
+            return self.error(500, 'key_hostname_should_be_specified')
+        if 'algo' not in req or req['algo'] not in self.server.manager.get_supported_keys_algo(req['hostname']):
+            return self.error(500, 'empty_or_incorrect_algo')
 
         try:
             result = self.server.manager.get_key(req)

@@ -28,13 +28,26 @@ class BaseCA(loggable.Loggable):
             self._request_cleanup = 2592000
 
     def generate_key(self, hostname, algo, bits):
+        """
+        Generate host private key
+
+        :param hostname:
+        :param algo:
+        :param bits:
+        :return:
+        """
+
         path = self._dir + '/' + hostname + '/key.pem'
         if not os.path.exists(path):
             if not os.path.exists(self._dir + '/' + hostname):
                 os.makedirs(self._dir + '/' + hostname)
 
-            self.log("Generating new key in %s" % path)
-            generate_cmd = ['openssl', 'genrsa', '-out', path, str(bits)]
+            self.log("Generating new key in %s, algo: %s" % (path, algo))
+            if algo == 'RSA':
+                generate_cmd = ['openssl', 'genrsa', '-out', path, str(bits)]
+            elif algo == 'EC-SECP384R1':
+                generate_cmd = ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out', path, '-noout']
+
             cmd = subprocess.Popen(generate_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             res = cmd.wait()
             if res != 0:
@@ -51,8 +64,11 @@ class BaseCA(loggable.Loggable):
     def get_fullchain_path(self, hostname):
         return self._dir + '/' + hostname + '/fullchain.pem'
 
-    def certificate_exists(self, hostname):
+    def certificate_exists(self, hostname, ip=None):
         path = self._dir + '/' + hostname + '/cert.pem'
+        if ip:
+            self.register_request(hostname, ip)
+
         return os.path.exists(path)
 
     def get_cert(self, hostname, ip=None):

@@ -105,6 +105,16 @@ class Manager(loggable.Loggable, threading.Thread):
         key = self.get_ca(req['hostname']).generate_key(req['hostname'], req['algo'], int(req['bits']))
         return {'key': key}
 
+    def get_supported_keys_algo(self, hostname):
+        """
+        Get list of support keys types for specific hostname
+
+        :param hostname:
+        :return:
+        """
+
+        return ['RSA', 'EC-SECP384R1']
+
     def get_key_path(self, hostname):
         return self.get_ca(hostname).get_key_path(hostname)
 
@@ -124,7 +134,7 @@ class Manager(loggable.Loggable, threading.Thread):
 
         self.log("Certificate request from %s for %s" % (ip, hostname))
 
-        if not ca.certificate_exists(hostname):
+        if not ca.certificate_exists(hostname, ip):
             self.add_to_queue(hostname)
             return {'status': 'pending'}
 
