@@ -1,7 +1,9 @@
 # coding: utf-8
 import time
+import threading
 
 
 class Loggable:
     def log(self, msg):
-        print(time.strftime('%Y/%m/%d %R ', time.localtime()) + msg.strip())
+        thname = threading.currentThread().name
+        print(time.strftime('%Y/%m/%d %R ', time.localtime()) + '[' + thname + '] ' + msg.strip())

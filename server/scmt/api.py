@@ -4,6 +4,7 @@ import socket
 import sys
 import SocketServer
 import SimpleHTTPServer
+from SocketServer import ThreadingMixIn
 import os
 import threading
 import json
@@ -83,7 +84,7 @@ class _ScmtHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, loggable.Loggable)
         pass
 
 
-class _ScmtApi(BaseHTTPServer.HTTPServer, loggable.Loggable):
+class _ScmtApi(ThreadingMixIn, BaseHTTPServer.HTTPServer, loggable.Loggable):
     def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True, manager=False):
         self.manager = manager
         BaseHTTPServer.HTTPServer.__init__(self, server_address, RequestHandlerClass, bind_and_activate)

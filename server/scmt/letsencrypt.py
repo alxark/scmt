@@ -154,7 +154,16 @@ class LetsEncrypt(BaseCA):
         return code, result
 
     def sign(self, hostname, csr):
-        if self._rate_limit_last > time.time() - 43200:
+        """
+        Sign new certificate
+
+        :param hostname:
+        :param csr:
+        :return:
+        """
+
+        # lets check if this is a new issue or we are already have active certificate for this domain
+        if not self.certificate_exists(hostname) and self._rate_limit_last > time.time() - 43200:
             mins_ago = int((time.time() - self._rate_limit_last)/60)
             raise RuntimeError("Denied sign because we have reached cert limit. Last error was %d mins ago" % mins_ago)
 
