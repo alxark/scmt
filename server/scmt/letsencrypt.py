@@ -45,7 +45,7 @@ class LetsEncrypt(BaseCA):
         if not os.path.exists(self.account_key):
             code, result = self.register()
             if code != 201:
-                self.log("Failed to register new LetsEncrypt account")
+                self.log("Failed to register new LetsEncrypt account. Reply: %s" % str(result))
                 raise RuntimeError("Failed to register LetsEncrypt account")
         else:
             self.log("Account key %s already exists" % self.account_key)

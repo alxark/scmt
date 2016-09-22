@@ -1,6 +1,6 @@
 import loggable
 import ConfigParser
-
+from ConfigParser import NoOptionError
 
 class ConfigReader(loggable.Loggable):
     _dir = False
@@ -14,11 +14,19 @@ class ConfigReader(loggable.Loggable):
         self.log("Loading configuration from %s" % path)
         parser.read(path)
 
-        self.dir = parser.get('general', 'dir')
-        self.log("Application working dir %s" % self.dir)
+        try:
+            self.dir = parser.get('general', 'dir')
+            self.log("Application working dir %s" % self.dir)
+        except NoOptionError:
+            self.dir = '/var/lib/scmt'
+            self.log("Using default data dir: /var/lib/scmt")
 
-        self.port = parser.getint('general', 'port')
-        self.log("Listen port %d" % self.port)
+        try:
+            self.port = parser.getint('general', 'port')
+            self.log("Listen port %d" % self.port)
+        except NoOptionError:
+            self.port = 443
+            self.log("Using default port 443")
 
         self.ssl = parser.get('general', 'ssl')
         self.log("Using SSL certificate for local connections, hostname: %s" % self.ssl)
