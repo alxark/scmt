@@ -14,6 +14,7 @@ class Manager(loggable.Loggable, threading.Thread):
         self._queueLock = threading.Lock()
         self._queue = []
         self._is_active = True
+        self._last_cleanup = 0
 
         if not os.path.exists(self._dir):
             os.makedirs(self._dir)
@@ -49,14 +50,19 @@ class Manager(loggable.Loggable, threading.Thread):
                 hook = Cloudflare(hook_opts)
             ca.set_hook(hook)
 
+            if not hook.verify(domain):
+                raise RuntimeError("Hook verification failed for %s" % domain)
+
         self.log("Initialized domain %s" % domain)
         return ca
 
     def run(self):
         self.log("Starting new manager thread")
         while self._is_active:
-            for zone in self._domains:
-                self._domains[zone].cleanup_certificates()
+            if self._last_cleanup < time.time() - 3600:
+                self._last_cleanup = time.time()
+                for zone in self._domains:
+                    self._domains[zone].cleanup_certificates()
 
             hostname = self.get_from_queue()
             if not hostname:
@@ -89,11 +95,12 @@ class Manager(loggable.Loggable, threading.Thread):
 
     def get_ca(self, hostname):
         for domain in self._domains.keys():
-            if hostname[-len(domain)-1:] != '.' + domain:
+            if hostname[-len(domain)-1:] != '.' + domain and hostname != domain:
                 continue
+
             return self._domains[domain]
 
-        raise RuntimeError("Failed to detect CA for %s" % domain)
+        raise RuntimeError("Failed to detect CA for %s" % hostname)
 
     def get_key(self, req):
         """
@@ -145,8 +152,6 @@ class Manager(loggable.Loggable, threading.Thread):
             'cert': cert,
             'fullchain': chain
         }
-
-
 
     def request_key(self, hostname):
         pass

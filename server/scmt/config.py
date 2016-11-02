@@ -2,6 +2,7 @@ import loggable
 import ConfigParser
 from ConfigParser import NoOptionError
 
+
 class ConfigReader(loggable.Loggable):
     _dir = False
     # port to listen for HTTP API
@@ -28,8 +29,12 @@ class ConfigReader(loggable.Loggable):
             self.port = 443
             self.log("Using default port 443")
 
-        self.ssl = parser.get('general', 'ssl')
-        self.log("Using SSL certificate for local connections, hostname: %s" % self.ssl)
+        try:
+            self.ssl = parser.get('general', 'ssl')
+            self.log("Using SSL certificate for local connections, hostname: %s" % self.ssl)
+        except NoOptionError:
+            self.ssl = False
+            self.log("SSL support disabled")
 
         sections = parser.sections()
         sections.remove('general')

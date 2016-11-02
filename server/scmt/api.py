@@ -10,6 +10,7 @@ import threading
 import json
 import time
 import ssl
+import re
 
 
 class _ScmtHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, loggable.Loggable):
@@ -32,6 +33,16 @@ class _ScmtHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, loggable.Loggable)
     def do_GET(self):
         return self.json({'ok': 1})
 
+    def get_client_ip(self):
+        if 'X-Real-IP' in self.headers:
+            ip = re.sub('/[^a-f0-9\.]/', '', self.headers['X-Real-IP'])
+            if len(ip) == 0 or ip != self.headers['X-Real-IP']:
+                return '127.0.0.1'
+
+            return ip
+
+        return self.client_address[0]
+
     def do_POST(self):
         if 'Content-Length' not in self.headers or int(self.headers['Content-Length']) == 0:
             return self.error(500, 'bad_content_length')
@@ -47,7 +58,7 @@ class _ScmtHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, loggable.Loggable)
         if req['type'] not in self.methods:
             return self.error(500, 'unacceptable_request_method')
 
-        req['ip'] = self.client_address[0]
+        req['ip'] = self.get_client_ip()
 
         return getattr(self, req['type'] + '_call')(req)
 
@@ -68,8 +79,8 @@ class _ScmtHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, loggable.Loggable)
 
         try:
             result = self.server.manager.get_key(req)
-        except RuntimeError:
-            return self.json({'code': 500, 'error': 'failed_to_generate_key'})
+        except RuntimeError as e:
+            return self.json({'code': 500, 'error': 'failed_to_generate_key', 'debug': e.message})
 
         result['code'] = 200
         return self.json(result, 200)
@@ -117,13 +128,15 @@ class Api(loggable.Loggable, threading.Thread):
         """
         Start HTTP daemon
         """
-
-
         self.log("Starting new API instance on %d" % self.port)
         http_handler = _ScmtHandler
         SocketServer.TCPServer.allow_reuse_address = True
 
-        http_service = _ScmtApi((self.host, self.port), http_handler, manager=self.manager)
+        try:
+            http_service = _ScmtApi((self.host, self.port), http_handler, manager=self.manager)
+        except socket.error as e:
+            self.log("Failed to bind to port. Got: %s" % str(e))
+            return False
 
         if self.ssl:
             self.manager.get_key({'hostname': self.ssl, 'algo': 'RSA', 'bits': 2048})

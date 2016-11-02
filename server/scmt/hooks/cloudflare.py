@@ -1,6 +1,7 @@
 import dns.exception
 import dns.resolver
 import requests
+import urllib2
 import sys
 import time
 from tld import get_tld
@@ -8,7 +9,11 @@ import scmt.loggable
 
 
 class Cloudflare(scmt.loggable.Loggable):
+    api_url = 'https://api.cloudflare.com/client/v4/'
+
     def __init__(self, options):
+        self._zoneCache = {}
+
         if 'email' not in options:
             raise RuntimeError("CloudFlare Hook Error. No Email provided.")
         self._email = options['email']
@@ -55,16 +60,23 @@ class Cloudflare(scmt.loggable.Loggable):
         return False
 
     def _get_zone_id(self, domain):
-
         tld = get_tld('http://' + domain)
+        if tld in self._zoneCache:
+            return self._zoneCache[tld]
 
-        url = "https://api.cloudflare.com/client/v4/zones?name={0}".format(tld)
+        url = self.get_full_url("zones?name={0}").format(tld)
         r = requests.get(url, headers=self.get_headers())
         r.raise_for_status()
-        return r.json()['result'][0]['id']
+
+        id = r.json()['result'][0]['id']
+        self.log("Zone ID for %s is %s" % (domain, id))
+
+        self._zoneCache[tld] = id
+
+        return id
 
     def _get_txt_record_id(self, zone_id, name, token):
-        url = "https://api.cloudflare.com/client/v4/zones/{0}/dns_records?type=TXT&name={1}&content={2}".format(zone_id, name, token)
+        url = self.get_full_url("zones/{0}/dns_records?type=TXT&name={1}&content={2}").format(zone_id, name, token)
         r = requests.get(url, headers=self.get_headers())
         r.raise_for_status()
         try:
@@ -79,7 +91,7 @@ class Cloudflare(scmt.loggable.Loggable):
         self.log("Creating new TXT record %s, token %s" % (domain, token))
         zone_id = self._get_zone_id(domain)
         name = "{0}.{1}".format('_acme-challenge', domain)
-        url = "https://api.cloudflare.com/client/v4/zones/{0}/dns_records".format(zone_id)
+        url = self.get_full_url("zones/{0}/dns_records").format(zone_id)
         payload = {
             'type': 'TXT',
             'name': name,
@@ -87,7 +99,8 @@ class Cloudflare(scmt.loggable.Loggable):
             'ttl': 1,
         }
 
-        r = requests.post(url, headers=self.get_headers(), json=payload)
+        headers = self.get_headers()
+        r = requests.post(url, headers=headers, json=payload)
         r.raise_for_status()
         record_id = r.json()['result']['id']
 
@@ -104,12 +117,59 @@ class Cloudflare(scmt.loggable.Loggable):
             self.log("DNS not propagated, waiting 30s, total time: %d..." % (time.time() - started))
             time.sleep(30)
 
+    def verify(self, domain):
+        """
+        Check if we can run this hook actions
+
+        :return:
+        """
+        records = self.get_records(domain)
+        self.log("Cleanup old data to prevent errors. Total domains: %d" % len(records))
+
+        zone_id = self._get_zone_id(domain)
+        for i in self.get_records(domain):
+            if i['name'][:16] == '_acme-challenge.':
+                self.log("Remove old acme challenge record: %s" % i['name'])
+                self._delete_record(zone_id, i['id'])
+
+        return True
+
+    def get_records(self, domain):
+        id = self._get_zone_id(domain)
+        page = 1
+
+        items = []
+        while True:
+            r = requests.get(self.get_full_url('zones/%s/dns_records?type=TXT&per_page=100&page=%d' % (id, page)), headers=self.get_headers())
+            r.raise_for_status()
+
+            result = r.json()
+
+            for record in result['result']:
+                items.append({
+                    'id': record['id'],
+                    'name': record['name']
+                })
+            page += 1
+            if int(result['result_info']['total_pages']) <= page:
+                break
+
+        return items
+
     def clean_challenge(self, domain, token):
         zone_id = self._get_zone_id(domain)
         name = "{0}.{1}".format('_acme-challenge', domain)
         record_id = self._get_txt_record_id(zone_id, name, token)
 
         self.log("Deleting TXT record name: %s" % name)
-        url = "https://api.cloudflare.com/client/v4/zones/{0}/dns_records/{1}".format(zone_id, record_id)
+        url = self.get_full_url("zones/{0}/dns_records/{1}").format(zone_id, record_id)
         r = requests.delete(url, headers=self.get_headers())
         r.raise_for_status()
+
+    def _delete_record(self, zone_id, record_id):
+        url = self.get_full_url("zones/%s/dns_records/%s" % (zone_id, record_id))
+        r = requests.delete(url, headers=self.get_headers())
+        r.raise_for_status()
+
+    def get_full_url(self, url):
+        return self.api_url + url

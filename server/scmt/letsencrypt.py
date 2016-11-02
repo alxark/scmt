@@ -135,7 +135,7 @@ class LetsEncrypt(BaseCA):
         """
         code, result = self._request(self.ca + "/acme/new-reg", {
             "resource": "new-reg",
-            "agreement": "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf"
+            "agreement": "https://letsencrypt.org/documents/LE-SA-v1.1.1-August-1-2016.pdf"
         })
         return code, result
 
@@ -186,7 +186,7 @@ class LetsEncrypt(BaseCA):
         key_authorization = "{0}.{1}".format(token, thumbprint)
 
         challenge_token = self._b64(hashlib.sha256(key_authorization.encode('utf8')).digest())
-        self._hook.deploy_challenge(hostname,challenge_token)
+        self._hook.deploy_challenge(hostname, challenge_token)
         self.challenge(challenge['uri'], key_authorization)
 
         try_until = time.time() + self._challenge_timeout

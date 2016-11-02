@@ -134,7 +134,7 @@ class BaseCA(loggable.Loggable):
             chain = (self.build_chain(self.get_cert(hostname)))
             with open(chain_path, 'w') as chain_out:
                 chain_out.write(chain)
-                self.log("Fullchain saved to %s" % chain_path)
+                self.log("Full-chain saved to %s" % chain_path)
 
         with open(chain_path, 'r') as chain_in:
             return chain_in.read()
@@ -227,7 +227,7 @@ class BaseCA(loggable.Loggable):
             self.cleanup_requests(hostname)
             if not self.have_requests(hostname):
                 self.log("Certificates for %s is not needed anymore, deleting it" % hostname)
-              #  shutil.rmtree(self._dir + '/' + hostname)
+                shutil.rmtree(self._dir + '/' + hostname)
 
             cert = self.get_cert(hostname)
             if not cert:
