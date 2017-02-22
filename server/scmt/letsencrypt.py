@@ -60,7 +60,8 @@ class LetsEncrypt(BaseCA):
         with open(crt_path, 'w') as out:
             out.write(cert)
             self.log("Generated certificate for %s, saved to %s" % (hostname, crt_path))
-        self.get_full_chain(hostname)
+
+        self.get_full_chain(hostname, force_reload=True)
 
     def get_account_key(self):
         """
@@ -171,7 +172,7 @@ class LetsEncrypt(BaseCA):
         code, result = self._request(self.ca + "/acme/new-authz", {
             "resource": "new-authz",
             "identifier": {"type": "dns", "value": hostname},
-            })
+        })
 
         if code != 201:
             self.log("Failed to start new issue. Got reply code: %d, answer: %s" % (code, result))

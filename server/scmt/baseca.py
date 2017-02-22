@@ -71,7 +71,7 @@ class BaseCA(loggable.Loggable):
 
         return os.path.exists(path)
 
-    def get_cert(self, hostname, ip=None):
+    def get_cert(self, hostname, ip=None, allow_old=False):
         crt_path = self._dir + '/' + hostname + '/cert.pem'
         if ip:
             self.register_request(hostname, ip)
@@ -124,12 +124,12 @@ class BaseCA(loggable.Loggable):
                 os.unlink(requests_dir + '/' + ip)
                 self.log("No requests for %s from IP %s for %d days" % (hostname, ip, (time.time() - timestamp) / 86400))
 
-    def get_full_chain(self, hostname):
+    def get_full_chain(self, hostname, force_reload=False):
         """
         Get all certificates in chain
         """
         chain_path = self._dir + '/' + hostname + '/fullchain.pem'
-        if not os.path.exists(chain_path):
+        if not os.path.exists(chain_path) or force_reload:
             self.log("Loading certificate chain for %s" % hostname)
             chain = (self.build_chain(self.get_cert(hostname)))
             with open(chain_path, 'w') as chain_out:
@@ -208,11 +208,20 @@ class BaseCA(loggable.Loggable):
         if not os.path.exists(csr_path):
             self.log("Generating new CSR request for %s, output %s" % (hostname, csr_path))
 
-            gencmd = ["openssl", "req", "-key", key_path, "-new", "-out", csr_path, "-subj", "/CN=" + hostname]
+            gencmd = ["openssl", "req", "-key", key_path, "-new", "-out", csr_path, "-subj", "/CN=" + self.get_cert_subject(hostname)]
             cmd = subprocess.Popen(gencmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             res = cmd.wait()
 
         return csr_path
+
+    def get_cert_subject(self, hostname):
+        """
+        Generate subject for certificate request
+
+        :param hostname:
+        :return:
+        """
+        return "/CN=" + hostname
 
     def cleanup_certificates(self):
         """
@@ -234,6 +243,8 @@ class BaseCA(loggable.Loggable):
                 continue
 
             info = self.get_cert_info(cert)
+
+            self.log("%s expiration time %s" % (hostname, info['NotAfter'].strftime('%Y/%m/%d')), level='debug')
             if int(info['NotAfter'].strftime('%s')) - time.time() < self._certificate_expiration:
                 self.log("Certificate for %s need to be renewed" % hostname)
                 try:
@@ -242,7 +253,14 @@ class BaseCA(loggable.Loggable):
                     self.log("Failed to issue new certificate for %s" % hostname)
 
     def issue_certificate(self, hostname):
+        """
+        This method should be redefined in child classes and will issue certificate for real
+
+        :param hostname:
+        :return:
+        """
         pass
+
 
     def set_hook(self, hook):
         self._hook = hook

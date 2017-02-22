@@ -2,6 +2,7 @@ import loggable
 import os
 from letsencrypt import LetsEncrypt
 from hooks.cloudflare import Cloudflare
+from privateca import PrivateCA
 import threading
 import time
 
@@ -21,13 +22,18 @@ class Manager(loggable.Loggable, threading.Thread):
             self.log("Creating path %s" % self._dir)
         self._domains = {}
         for domain in domains:
-            self._domains[domain] = self.init_domain(domain, domains[domain])
+            try:
+                self._domains[domain] = self.init_domain(domain, domains[domain])
+            except IndexError:
+                self.log("Failed to initialize domain: %s" % domain)
+                continue
+
             self._locks[domain] = threading.Lock()
 
         threading.Thread.__init__(self)
 
     def init_domain(self, domain, config):
-        if 'ca' not in config or config['ca'] not in ['letsencrypt']:
+        if 'ca' not in config or config['ca'] not in ['letsencrypt', 'privateca']:
             raise RuntimeError("Failed to initialize domain %s, no CA or wrong CA type" % domain)
 
         config['dir'] = self._dir + '/' + domain
@@ -36,6 +42,8 @@ class Manager(loggable.Loggable, threading.Thread):
 
         if config['ca'] == 'letsencrypt':
             ca = LetsEncrypt(config)
+        elif config['ca'] == 'privateca':
+            ca = PrivateCA(config)
         else:
             raise RuntimeError("Wrong CA name for %s, CA %s is unacceptable" % (domain, config['ca']))
 
@@ -57,6 +65,11 @@ class Manager(loggable.Loggable, threading.Thread):
         return ca
 
     def run(self):
+        """
+        Proceed certificate issue requests in separate thread
+
+        :return:
+        """
         self.log("Starting new manager thread")
         while self._is_active:
             if self._last_cleanup < time.time() - 3600:
@@ -89,9 +102,6 @@ class Manager(loggable.Loggable, threading.Thread):
             hostname = self._queue.pop(0)
 
         return hostname
-
-    def test(self):
-        return {'sdfsdf': 1, 'sdfsss':2}
 
     def get_ca(self, hostname):
         for domain in self._domains.keys():

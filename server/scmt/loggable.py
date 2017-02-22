@@ -4,6 +4,6 @@ import threading
 
 
 class Loggable:
-    def log(self, msg):
+    def log(self, msg, level='info'):
         thname = threading.currentThread().name
-        print(time.strftime('%Y/%m/%d %R ', time.localtime()) + '[' + thname + '] ' + msg.strip())
+        print(time.strftime('%Y/%m/%d %R ', time.localtime()) + '[' + thname + '] [' + level + '] ' + msg.strip())
