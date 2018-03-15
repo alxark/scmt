@@ -14,5 +14,5 @@ RUN apk add --no-cache --update openssl \
     && cp -R /tmp/server /app/scmt \
     && mkdir -p /var/lib/scmt
 
-VOLUMES ["/var/lib/scmt"]
+VOLUME ["/var/lib/scmt"]
 CMD ["python", "/app/scmt/run.py", "/var/lib/scmt/scmt.ini"]
