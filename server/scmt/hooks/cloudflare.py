@@ -29,6 +29,7 @@ class Cloudflare(scmt.loggable.Loggable):
 
         self.log("CloudFlare hook initialized, Email: %s" % self._email)
         self._timeout = 1800
+        self._net_timeout = 120
 
     def get_headers(self):
         return {
@@ -163,12 +164,12 @@ class Cloudflare(scmt.loggable.Loggable):
 
         self.log("Deleting TXT record name: %s" % name)
         url = self.get_full_url("zones/{0}/dns_records/{1}").format(zone_id, record_id)
-        r = requests.delete(url, headers=self.get_headers())
+        r = requests.delete(url, headers=self.get_headers(), timeout=self._net_timeout)
         r.raise_for_status()
 
     def _delete_record(self, zone_id, record_id):
         url = self.get_full_url("zones/%s/dns_records/%s" % (zone_id, record_id))
-        r = requests.delete(url, headers=self.get_headers())
+        r = requests.delete(url, headers=self.get_headers(), timeout=self._net_timeout)
         r.raise_for_status()
 
     def get_full_url(self, url):

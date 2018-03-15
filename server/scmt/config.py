@@ -9,6 +9,7 @@ class ConfigReader(loggable.Loggable):
     port = 8790
     # storage for domains
     _domains = {}
+    _storages = {}
 
     def __init__(self, path):
         parser = ConfigParser.ConfigParser()
@@ -39,13 +40,25 @@ class ConfigReader(loggable.Loggable):
         sections = parser.sections()
         sections.remove('general')
 
-        for domain in sections:
-            self.log("Parsing section %s" % domain)
-            options = parser.options(domain)
+        for section in sections:
+            options = parser.options(section)
+            values = {}
+            for option in options:
+                values[option] = parser.get(section, option)
 
-            self._domains[domain] = {}
-            for opt in options:
-                self._domains[domain][opt] = parser.get(domain, opt)
+            if 'type' in values and values['type'] == 'storage':
+                self._storages[section] = self.parse_storage_values(values)
+            else:
+                self._domains[section] = self.parse_domain_values(values)
+
+    def parse_storage_values(self, values):
+        return values
+
+    def parse_domain_values(self, values):
+        return values
+
+    def get_storages(self):
+        return self._storages
 
     def get_domains(self):
         return self._domains
