@@ -180,8 +180,14 @@ class CertLoader:
 
 LOAD_TIMEOUT = 500
 
+if os.getenv('SCMT_CONFIG') != '':
+    app_config = os.getenv('SCMT_CONFIG')
+else:
+    app_config = '/etc/scmt-client.ini'
+
 parser = ConfigParser.ConfigParser()
-parser.read('/etc/scmt-client.ini')
+log("Loading configuration from %s" % app_config)
+parser.read(app_config)
 
 sections = parser.sections()
 
