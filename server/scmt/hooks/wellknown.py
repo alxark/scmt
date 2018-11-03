@@ -21,17 +21,23 @@ class WellKnownHttpHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, scmt.logga
         if path_data[1] != '.well-known':
             return self.fail()
 
+        if path_data[2] == 'acme-test':
+            return self.ok('available')
+
         token = path_data[-1]
         try:
             reply = self.server.hook.get_challenge(token)
         except IndexError:
             return self.fail()
 
+        return self.ok(reply)
+
+    def ok(self, msg):
         self.send_response(200)
         self.send_header('Content-type', 'text/plain')
         self.end_headers()
 
-        self.wfile.write(reply)
+        self.wfile.write(msg)
 
     def do_HEAD(self):
         return self.fail()
