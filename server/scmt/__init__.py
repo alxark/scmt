@@ -1,4 +1,3 @@
-import cmdhook
 import ca
 import loggable
 import config

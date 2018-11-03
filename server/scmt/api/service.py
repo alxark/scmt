@@ -7,9 +7,9 @@ from handler import Handler
 from server import Server as ApiServer
 import time
 import ssl
+import scmt.loggable
 
-
-class Service(threading.Thread):
+class Service(threading.Thread, scmt.loggable.Loggable):
     def __init__(self, manager, port, ssl=None):
         self.manager = manager
         self.port = port
@@ -17,9 +17,6 @@ class Service(threading.Thread):
         self.ssl = ssl
 
         threading.Thread.__init__(self)
-
-    def log(self, msg):
-        pass
 
     def is_running(self):
         return True

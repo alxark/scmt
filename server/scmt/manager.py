@@ -5,7 +5,10 @@ import time
 import loggable
 import sys
 import socket
+
 from hooks.cloudflare import Cloudflare
+from hooks.wellknown import WellKnown
+
 from ca.letsencrypt import LetsEncrypt
 from ca.privateca import PrivateCA
 
@@ -66,6 +69,8 @@ class Manager(loggable.Loggable, threading.Thread):
 
             if config['hook'] == 'cloudflare':
                 hook = Cloudflare(hook_opts)
+            elif config['hook'] == 'well-known':
+                hook = WellKnown(hook_opts)
             ca.set_hook(hook)
 
             if not hook.verify(domain):

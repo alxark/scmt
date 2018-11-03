@@ -88,7 +88,7 @@ class Cloudflare(scmt.loggable.Loggable):
 
         return record_id
 
-    def deploy_challenge(self, domain, token):
+    def deploy_challenge(self, domain, token, key_authorization = ''):
         self.log("Creating new TXT record %s, token %s" % (domain, token))
         zone_id = self._get_zone_id(domain)
         name = "{0}.{1}".format('_acme-challenge', domain)
@@ -174,3 +174,6 @@ class Cloudflare(scmt.loggable.Loggable):
 
     def get_full_url(self, url):
         return self.api_url + url
+
+    def get_challenge_type(self):
+        return 'dns-01'

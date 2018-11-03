@@ -24,11 +24,12 @@ class App(loggable.Loggable):
             storage_list[storage_name] = storages.builder.build(storage)
 
         manager = Manager(self.config.dir, self.config.get_domains(), storage_list)
-
+        self.log("Starting manager service")
+        manager.start()
+        self.log("Starting API service")
         api_service = api.service.Service(manager, self.config.port, self.config.ssl)
         api_service.start()
 
-        manager.start()
 
 
     @staticmethod

@@ -179,7 +179,7 @@ class LetsEncrypt(BaseCA):
             self.log("Failed to start new issue. Got reply code: %d, answer: %s" % (code, result))
             raise RuntimeError("Failed to run auth. Reply code: %d" % code)
 
-        challenge = [c for c in json.loads(result.decode('utf8'))['challenges'] if c['type'] == "dns-01"][0]
+        challenge = [c for c in json.loads(result.decode('utf8'))['challenges'] if c['type'] == self._hook.get_challenge_type()][0]
 
         accountkey_json = json.dumps(self._jwk()['jwk'], sort_keys=True, separators=(',', ':'))
         thumbprint = self._b64(hashlib.sha256(accountkey_json.encode('utf8')).digest())
@@ -188,7 +188,7 @@ class LetsEncrypt(BaseCA):
         key_authorization = "{0}.{1}".format(token, thumbprint)
 
         challenge_token = self._b64(hashlib.sha256(key_authorization.encode('utf8')).digest())
-        self._hook.deploy_challenge(hostname, challenge_token)
+        self._hook.deploy_challenge(hostname, challenge_token, key_authorization)
         self.challenge(challenge['uri'], key_authorization)
 
         try_until = time.time() + self._challenge_timeout

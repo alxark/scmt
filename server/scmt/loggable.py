@@ -8,5 +8,7 @@ class Loggable:
     def log(self, msg, level='info'):
         thread_name = threading.currentThread().name
 
-        sys.stdout.write(time.strftime('%Y/%m/%d %R ', time.localtime()) + '[' + thread_name + '] [' + level + '] ' + msg.strip() + "\n")
+        sys.stdout.write(time.strftime('%Y/%m/%d %R ', time.localtime()) + '['
+                         + str(thread_name)
+                         + '] [' + str(level) + '] ' + msg.strip() + "\n")
         sys.stdout.flush()
