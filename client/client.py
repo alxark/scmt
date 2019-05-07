@@ -6,6 +6,7 @@ import urllib
 import json
 import sys
 import json
+import re
 import syslog
 import time
 import random
@@ -54,6 +55,29 @@ class CertLoader:
         log("Failed to load all certs")
         return False
 
+    def prepare_variable(self, variable):
+        """
+        Replace variables in item with environment variables
+
+        :param variable:
+        :return:
+        """
+        rgx = re.findall('\$\{[a-zA-Z0-9\_]+\}', variable)
+
+        result = variable
+        for v in rgx:
+            try:
+                envRes = os.getenv(v, "")
+            except:
+                continue
+
+            if envRes == "":
+                continue
+
+            result = result.replace('${' + v + '}', envRes)
+
+        return result
+
     def load_service_certs(self, service, service_info):
         hostname = service_info['hostname']
         key = service_info['key']
@@ -74,7 +98,7 @@ class CertLoader:
         else:
             trigger = None
 
-        generator = service_info['generator']
+        generator = self.prepare_variable(service_info['generator'])
         log("Working on %s/%s from %s" % (service, hostname, generator))
 
         req = {
