@@ -78,10 +78,30 @@ class CertLoader:
 
         return result
 
+    def fail_with_fallback(self, key, cert, fallback):
+        """
+        Check if we already have key and cert and in fallback mode
+
+        :param key:
+        :param cert:
+        :param fallback:
+        :return:
+        """
+        if os.path.exists(key) and os.path.exists(cert) and fallback:
+            log("Fallback mode, old keys and certs: %s %s" % (key, cert))
+            return True
+        else:
+            return False
+
     def load_service_certs(self, service, service_info):
         hostname = service_info['hostname']
         key = service_info['key']
         cert = service_info['cert']
+
+        if 'fallback' in service_info:
+            fallback = True
+        else:
+            fallback = False
 
         if 'algo' in service_info:
             algo = service_info['algo']
@@ -115,11 +135,11 @@ class CertLoader:
         try:
             info = json.loads(backend_answer)
         except ValueError:
-            return False
+            return self.fail_with_fallback(key, cert, fallback)
 
         if 'key' not in info:
             log("no key found, reply: %s" % backend_answer)
-            return False
+            return self.fail_with_fallback(cert, key, fallback)
 
         if not os.path.exists(os.path.dirname(key)):
             log("Create directory to store key file")
@@ -140,15 +160,15 @@ class CertLoader:
             cert_info = json.loads(backend_answer)
         except ValueError:
             log("failed to parse cert request")
-            return False
+            return self.fail_with_fallback(key, cert, fallback)
 
         if 'status' not in cert_info:
             log("No status info found")
-            return False
+            return self.fail_with_fallback(key, cert, fallback)
 
         if 'fullchain' not in cert_info:
             log("No fullchain found in reply")
-            return False
+            return self.fail_with_fallback(key, cert, fallback)
 
         if cert_info['status'] == 'available':
             updated = False
@@ -225,6 +245,7 @@ for service_name in sections:
         services[service_name][opt] = parser.get(service_name, opt)
 
 loader = CertLoader()
+
 if '-once' in sys.argv:
     log("Downloading certificates first time")
     loader.blocking_load(services, LOAD_TIMEOUT)
